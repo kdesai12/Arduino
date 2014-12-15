@@ -10,11 +10,11 @@ int gPin = 5;
 int bPin = 6;
 
 int analogPin = 5;
-
-int buttonPin1 = 9;
+int vPin = 9;
+//int buttonPin1 = 9;
 long lastPress1 = 0;
 
-int buttonPin2 = 10;
+//int buttonPin2 = 10;
 long lastPress2 = 0;
 //pins on LCD display
 // lcd(4,5,6,14,13,12,11)
@@ -45,12 +45,12 @@ int riskLevel = 1;
 int currentDisplayItem = 1;
 long lastUpdate = 5000;
 long lastLoop = 0;
-int lcdDelay = 5500; //Milliseconds
+int lcdDelay = 2000; //Milliseconds
 
 // Pins on Trinket
 LiquidCrystalFast lcd(8,14,4,18,17,16,15);
-Button button1 = Button(9);
-Button button2 = Button(10);
+//Button button1 = Button(11);
+//Button button2 = Button(12);
 
 void setup(void)
 {
@@ -61,7 +61,8 @@ void setup(void)
 pinMode(rPin, OUTPUT);
 pinMode(gPin, OUTPUT);
 pinMode(bPin, OUTPUT);
-pinMode(buttonPin2, INPUT);
+pinMode(vPin, OUTPUT);
+pinMode(analogPin, INPUT);
 setOff();
 delay(10000);
 testScript();
@@ -71,9 +72,6 @@ void loop(void)
 {
   analog5Pressed();
   updateDisplay();
-//  delay(120);
-//  int val = analogRead(analogPin);    // read the input pin
-//  Serial.println(val);             // debug value
 }
 
 //Functions
@@ -82,7 +80,6 @@ void testScript()
   Serial.println(queueSize());
   addPatient("Bobby", 99, 3);
   addPatient("Zach", 20,4);
-
   removePatient("Zach");
   removePatient("Bobby");
     delay(1000);
@@ -90,51 +87,58 @@ void testScript()
 
 void analog5Pressed()
 {
-  Serial.println(analogRead(analogPin));
+  int s = analogRead(analogPin);
+  //Serial.println(s);
+  delay(20);
   Serial.println(existsName("Joe") == 1);
-  if ((analogRead(analogPin) > 980) && (millis() - lastPress1 > 5000) && (existsName("Joe") == 0)) {
+  delay(20);
+  if ((s > 1010) && (millis() - lastPress1 > 5000) && (existsName("Joe") == 0)) {
+    Serial.println(s);
     addPatient("Joe",52,3);
     lastPress1 = millis();
-    printQueues("Button 1: Added Joe");
+    printQueues("Button Analog 1: Added Joe");
+    updateDisplay();
+    delay(1000);
   }
 }
 void addPatient(String patientName, int patRoomNumber, int patRiskLevel) 
 {
+  
   printQueues("Adding " + patientName);
   nameQueue = addQueueEntry(nameQueue, patientName, 1);
   roomQueue = addQueueEntry(roomQueue, String(patRoomNumber), 1);
   riskQueue = addQueueEntry(riskQueue, String(patRiskLevel), 1);
   printQueues("Added " + patientName);
 }
-
-void buttonPressed()
-{
-  int buttonState1 = button1.isPressed();
- 
-  if (buttonState1 == 0) {
-  Serial.println("Button 1 Pressed");
-  }
-
-  int buttonState2 = button2.isPressed();
-  if (buttonState2 == 0) {  
-  Serial.println("Button 2 Pressed"); }
-  //Button 1 Pressed
-  if ((buttonState1 == 1) && (millis() - lastPress1 > 5000) && (existsName("Joe") == 0)) {
-    nameQueue = addQueueEntry(nameQueue, "Joe", 1);
-    roomQueue = addQueueEntry(roomQueue, "52", 1);
-    riskQueue = addQueueEntry(riskQueue, "4", 1);
-    lastPress1 = millis();
-    printQueues("Button 1: Added Joe");
-  }    
-  //Button 2 Pressed
-  if ((buttonState2 == 1) && (millis() - lastPress2 > 5000) && (existsName("Steve") == 0)) {
-    nameQueue = addQueueEntry(nameQueue, "Steve", 1);
-    roomQueue = addQueueEntry(roomQueue, "39", 1);
-    riskQueue = addQueueEntry(riskQueue, "3", 1);
-    lastPress2 = millis();
-    printQueues("Button 2: Added Steve");
-  }    
-}
+//
+//void buttonPressed()
+//{
+//  int buttonState1 = button1.isPressed();
+// 
+//  if (buttonState1 == 0) {
+//  Serial.println("Button 1 Pressed");
+//  }
+//
+//  int buttonState2 = button2.isPressed();
+//  if (buttonState2 == 0) {  
+//  Serial.println("Button 2 Pressed"); }
+//  //Button 1 Pressed
+//  if ((buttonState1 == 1) && (millis() - lastPress1 > 5000) && (existsName("Joe") == 0)) {
+//    nameQueue = addQueueEntry(nameQueue, "Joe", 1);
+//    roomQueue = addQueueEntry(roomQueue, "52", 1);
+//    riskQueue = addQueueEntry(riskQueue, "4", 1);
+//    lastPress1 = millis();
+//    printQueues("Button 1: Added Joe");
+//  }    
+//  //Button 2 Pressed
+//  if ((buttonState2 == 1) && (millis() - lastPress2 > 5000) && (existsName("Steve") == 0)) {
+//    nameQueue = addQueueEntry(nameQueue, "Steve", 1);
+//    roomQueue = addQueueEntry(roomQueue, "39", 1);
+//    riskQueue = addQueueEntry(riskQueue, "3", 1);
+//    lastPress2 = millis();
+//    printQueues("Button 2: Added Steve");
+//  }    
+//}
 
 void updateDisplay() 
 {
@@ -147,7 +151,7 @@ if (millis() - lastUpdate > lcdDelay) {
       
   getAllData(currentDisplayItem);
   displayPatientInfo(currentDisplayItem);
-  Serial.println(currentDisplayItem);
+  //Serial.println(currentDisplayItem);
   currentDisplayItem++;
   lastUpdate = millis();
 }
@@ -172,6 +176,7 @@ void printQueues(String Header)
   Serial.println(roomQueue);
   Serial.println(riskQueue);
 }
+
 
 void removePatient(String patientName)
 {
@@ -334,12 +339,12 @@ int queueSize() {
 void displayPatientInfo(int itemNumber) {
   lcd.clear();
  //lcd.home();
- if (name != "") {
+ if (queueSize() >= 1) {
   lcdLine1 = formatString("Name: " + name);
   lcdLine2 = formatString("Room#: " + rNum); }
  else {
       lcdLine1 = formatString("   No Patient   ");
-  lcdLine2 = formatString("    Alerts    ");
+  lcdLine2 = formatString("     Alerts   ");
   }
   Serial.println(lcdLine1);
   Serial.println(lcdLine2);
