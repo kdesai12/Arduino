@@ -2,54 +2,82 @@
 #include <nRF24L01.h>
 #include <RF24.h>
 #include <RF24_config.h>
+#include <RF24Network.h>
 
 RF24 radio(9,10);
-const uint64_t pipe1 = 0xF0F0F0F0E1LL;
 
+
+
+// Network uses that radio
+RF24Network network(radio);
+
+// Address of our node
+const uint16_t this_node = 1;
+
+// Address of the other node
+const uint16_t other_node = 0;
+
+const uint64_t pipe1 = 0xE8E8F0F0E1LL;
+// How often to send 'hello world to the other unit
+const unsigned long interval = 2000; //ms
+
+// When did we last send?
+unsigned long last_sent;
 void setup(void)
 {
-  Serial.begin(9600);
+  SPI.begin();
   radio.begin();
+  network.begin(/*channel*/ 90, /*node address*/ this_node);
+  //radio.begin();
   // optionally, increase the delay between retries & # of retries
-  radio.setRetries(10,20);
-  radio.setDataRate(RF24_250KBPS);
-  radio.setChannel(5);
-  radio.openWritingPipe(pipe1);
+  //radio.setRetries(15,20);
+  //radio.setChannel(100);
+
+  //radio.openWritingPipe(pipe1);
+
+  //delay(10000);
+
 }
 
 void loop(void)
 {
-  sendData("Message 1");
-  delay(5500);
-  sendData("Message 2");
-  delay(5500);
-}
+  sendDataNetwork();
 
-void sendData(String data)
-{
-  radio.startListening();
-  int messageSize = data.length();
-  int charToSend[1];
-  int sent = 0;
-  for (int i = 0; i < messageSize; i++)
+}
+void sendDataNetwork() {
+  // Pump the network regularly
+  network.update();
+
+  // If it's time to send a message, send it!
+  unsigned long now = millis();
+  if ( now - last_sent > interval  )
   {
-    sent = 0;
-    charToSend[0] = data.charAt(i);
-    Serial.println(charToSend[0]);
-    while (sent == 0)
+    last_sent = now;
+
+    //toggleLED();
+    printf("Sending...\r\n");
+    const char* hello = "Hello, world!";
+    RF24NetworkHeader header(/*to node*/ other_node);
+    bool ok = network.write(header,hello,strlen(hello));
+    if (ok)
+      printf("\tok.\r\n");
+    else
     {
-      Serial.println("Sent = 0");
-      sent = radio.write(charToSend, 1);
+      printf("\tfailed.\r\n");
+      delay(250); // extra delay on fail to keep light on longer
     }
-    Serial.println("Char Sent!");
+    //toggleLED();
   }
-  char EndChar = '9';
-  radio.write(EndChar,1);
-  
-  radio.powerDown();
-  delay(1000);
-  radio.powerUp();
 }
 
+void sendData(int patientNumber)
+{
+radio.stopListening();
+  //Serial.println(patientNumber);
+int sent = radio.write(&patientNumber,sizeof(int));
+Serial.println(sent);
+radio.startListening();
+
+}
 
 

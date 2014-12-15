@@ -8,7 +8,7 @@
 //SETUP LCD DISPLAY
 int cePin = 9;
 int csPin = 10;
-
+d
 int rPin = 3;
 int gPin = 5;
 int bPin = 6;
