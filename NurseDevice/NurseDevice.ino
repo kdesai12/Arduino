@@ -9,13 +9,13 @@ int rPin = 3;
 int gPin = 5;
 int bPin = 6;
 
-int analogPin = 5;
-int vPin = 9;
-//int buttonPin1 = 9;
+int analogPin1 = 19;
+int digButtonPin2 = 12;
+int vPin = 10;
 long lastPress1 = 0;
-
-//int buttonPin2 = 10;
 long lastPress2 = 0;
+
+long lastVibrate = 0;
 //pins on LCD display
 // lcd(4,5,6,14,13,12,11)
 //    (RS,RW, EN, DB7, DB6, DB5, DB4)
@@ -43,9 +43,9 @@ String lcdLine2 = "";
 byte screenOn = 1;
 int riskLevel = 1;
 int currentDisplayItem = 1;
-long lastUpdate = 5000;
+long lastUpdate = 0;
 long lastLoop = 0;
-int lcdDelay = 2000; //Milliseconds
+int lcdDelay = 1000; //Milliseconds
 
 // Pins on Trinket
 LiquidCrystalFast lcd(8,14,4,18,17,16,15);
@@ -62,16 +62,23 @@ pinMode(rPin, OUTPUT);
 pinMode(gPin, OUTPUT);
 pinMode(bPin, OUTPUT);
 pinMode(vPin, OUTPUT);
-pinMode(analogPin, INPUT);
+digitalWrite(vPin, LOW);
+pinMode(digButtonPin2, INPUT);
+pinMode(analogPin1, INPUT);
+
 setOff();
-delay(10000);
-testScript();
+delay(5000);
+//testScript();
 }
 
 void loop(void)
 {
   analog5Pressed();
+  digButton12Pressed();
   updateDisplay();
+  if (millis() - lastVibrate > 750)
+  { digitalWrite(vPin, LOW); }
+  
 }
 
 //Functions
@@ -82,23 +89,37 @@ void testScript()
   addPatient("Zach", 20,4);
   removePatient("Zach");
   removePatient("Bobby");
-    delay(1000);
+  delay(2000);
 }
 
+void digButton12Pressed()
+{
+  int len = 8;
+  int sum = 0;
+  int expVal = 1; 
+  for (int i = 1; i <= len; i++) 
+  { sum += digitalRead(digButtonPin2);  delay(25);}
+  
+  //Serial.println(existsName("Joe") == 1);
+  if ((sum == (len * expVal)) && (millis() - lastPress2 > 5000) && (existsName("Steve") == 0)) {
+    addPatient("Steve",39,4);
+    lastPress2 = millis();
+    printQueues("Button 2 Digital: Added Steve");
+  }
+}
 void analog5Pressed()
 {
-  int s = analogRead(analogPin);
-  //Serial.println(s);
-  delay(20);
-  Serial.println(existsName("Joe") == 1);
-  delay(20);
-  if ((s > 1010) && (millis() - lastPress1 > 5000) && (existsName("Joe") == 0)) {
-    Serial.println(s);
+  int len = 8;
+  int sum = 0;
+  int expVal = 1023; 
+  for (int i = 1; i <= len; i++) 
+  { sum += analogRead(analogPin1); delay(25); }
+  
+  //Serial.println(existsName("Joe") == 1);
+  if ((sum == len * expVal) && (millis() - lastPress1 > 5000) && (existsName("Joe") == 0)) {
     addPatient("Joe",52,3);
     lastPress1 = millis();
-    printQueues("Button Analog 1: Added Joe");
-    updateDisplay();
-    delay(1000);
+    printQueues("Button 2 Analog: Added Joe");
   }
 }
 void addPatient(String patientName, int patRoomNumber, int patRiskLevel) 
@@ -110,45 +131,25 @@ void addPatient(String patientName, int patRoomNumber, int patRiskLevel)
   riskQueue = addQueueEntry(riskQueue, String(patRiskLevel), 1);
   printQueues("Added " + patientName);
 }
-//
-//void buttonPressed()
-//{
-//  int buttonState1 = button1.isPressed();
-// 
-//  if (buttonState1 == 0) {
-//  Serial.println("Button 1 Pressed");
-//  }
-//
-//  int buttonState2 = button2.isPressed();
-//  if (buttonState2 == 0) {  
-//  Serial.println("Button 2 Pressed"); }
-//  //Button 1 Pressed
-//  if ((buttonState1 == 1) && (millis() - lastPress1 > 5000) && (existsName("Joe") == 0)) {
-//    nameQueue = addQueueEntry(nameQueue, "Joe", 1);
-//    roomQueue = addQueueEntry(roomQueue, "52", 1);
-//    riskQueue = addQueueEntry(riskQueue, "4", 1);
-//    lastPress1 = millis();
-//    printQueues("Button 1: Added Joe");
-//  }    
-//  //Button 2 Pressed
-//  if ((buttonState2 == 1) && (millis() - lastPress2 > 5000) && (existsName("Steve") == 0)) {
-//    nameQueue = addQueueEntry(nameQueue, "Steve", 1);
-//    roomQueue = addQueueEntry(roomQueue, "39", 1);
-//    riskQueue = addQueueEntry(riskQueue, "3", 1);
-//    lastPress2 = millis();
-//    printQueues("Button 2: Added Steve");
-//  }    
-//}
+void vibrate()
+{
+  if (millis() - lastVibrate > 3500) {
+  digitalWrite(vPin, HIGH);
+  lastVibrate = millis(); }
+}
 
 void updateDisplay() 
 {
-if (millis() - lastUpdate > lcdDelay) {
   
+  if (queueSize() == 0) { lcdDelay = 750; }
+  else { lcdDelay = 1500; }
+  
+  
+if (millis() - lastUpdate > lcdDelay) {
   if (currentDisplayItem > queueSize()) 
    { 
       currentDisplayItem = 1; 
    }
-      
   getAllData(currentDisplayItem);
   displayPatientInfo(currentDisplayItem);
   //Serial.println(currentDisplayItem);
@@ -156,13 +157,13 @@ if (millis() - lastUpdate > lcdDelay) {
   lastUpdate = millis();
 }
 
-if (millis() - lastPress1 > 10000 && existsName("Joe") == 1)
+if (millis() - lastPress1 > 15000 && existsName("Joe") == 1)
 {
   removePatient("Joe");
   lastPress1 = millis();
 }
 
-if (millis() - lastPress2 > 15000 && existsName("Steve") == 1)
+if (millis() - lastPress2 > 30000 && existsName("Steve") == 1)
 {
   removePatient("Steve");
   lastPress2 = millis();
@@ -181,7 +182,6 @@ void printQueues(String Header)
 void removePatient(String patientName)
 {
   if (existsName(patientName) == 1) {
-  printQueues("Removing Patient ---> " + patientName);
   int nameIndex = findNameIndex(patientName); 
 
 nameQueue = deleteQueueEntry(nameQueue, nameIndex);
@@ -341,9 +341,11 @@ void displayPatientInfo(int itemNumber) {
  //lcd.home();
  if (queueSize() >= 1) {
   lcdLine1 = formatString("Name: " + name);
-  lcdLine2 = formatString("Room#: " + rNum); }
+  lcdLine2 = formatString("Room#: " + rNum); 
+  vibrate();
+}
  else {
-      lcdLine1 = formatString("   No Patient   ");
+  lcdLine1 = formatString("   No Patient   ");
   lcdLine2 = formatString("     Alerts   ");
   }
   Serial.println(lcdLine1);
@@ -396,9 +398,9 @@ String expand16(String Str) {
 
 void setOff()
 {
-analogWrite(rPin, 150);
-analogWrite(gPin, 150);
-analogWrite(bPin, 150);
+analogWrite(rPin, 0);
+analogWrite(gPin, 0);
+analogWrite(bPin, 0);
 }
 
 void setRed()
