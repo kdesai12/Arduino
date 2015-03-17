@@ -24,7 +24,7 @@ long lastPress2 = 0;
 
 //Last Vibrate Time
 long lastVibrate = 0;
-
+int vibTime = 500;
 //initialize RGB values for backlight
 int r = 0;
 int g = 0;
@@ -39,27 +39,26 @@ int b = 0;
 String nameQueue = "";
 String roomQueue = "";
 String riskQueue = "";
-
+String timeQueue = "";
 // Initialize Single Patient Values
 String name = "";
 String rNum ="";
 int riskLevel = 1;
+float patTime=0;
 
 int currentDisplayItem = 1;
+int timeoutMins = 10; //Patient timeout Period Mins
+long lastLCDUpdate = 0; // Last Time LCD was updated
+int lcdDelay = 750;; //Time btwn LCD update
+// Patient  Timeout
+int timeoutInterval = 15000; //check if patients are timed out every XX ms
+long lastTimeoutCheck = 0;//last time patient timeout was checked
+//Intialize LCD ***
 
-// Last Time LCD was updated
-long lastUpdate = 0;
-// Time between LCD Updates
-int lcdDelay = 1000; //Milliseconds
-
-//pins on LCD display
-// lcd(4,5,6,14,13,12,11)
-//    (RS,RW,EN,DB7,DB6,DB5,DB4)
-LiquidCrystalFast lcd(8,14,4,18,17,16,15);
 
 void setup(void)
 {
-  lcd.begin(16, 2); 
+  lcd.begin(16, 2);  // ***
   // Initialize background color pins
   pinMode(rPin, OUTPUT);
   pinMode(gPin, OUTPUT);
@@ -68,9 +67,6 @@ void setup(void)
   pinMode(vPin, OUTPUT);
   // Set Vibration pin off
   digitalWrite(vPin, LOW);
-  // Initialize buttons
-  pinMode(digButtonPin2, INPUT);
-  pinMode(analogPin1, INPUT);
   // Set Background of LCD to white
   setOff();
   // Wait 2 seconds for device to start
@@ -79,66 +75,24 @@ void setup(void)
 
 void loop(void)
 {
-  // Action when button 1 is pressed
-  analog5Pressed();
-  // action when button 2 is pressed
-  digButton12Pressed();
-  // Update Display based on new information
+  if queueSize() > 0 { lcdDelay = 750 }
+  else { lcdDelay = 1200 }
+  
   updateDisplay();
   // Check vibration status AND 
   //turn off if vibraion has occured for > 750ms
-  if (millis() - lastVibrate > 750)
+  if (millis() - lastVibrate > (long) vibTime)
   { digitalWrite(vPin, LOW); }
 }
 
 //Functions
-
-
-void digButton12Pressed()
-//Add Patient Steve when Button 2 is pressed for (LEN * 12ms)
-{ 
-  int len = 16;
-  int sum = 0;
-  int expVal = 1; 
-  //Check button status for LEN * 12ms
-  for (int i = 1; i <= len; i++) 
-  { 
-    sum += digitalRead(digButtonPin2); 
-    delay(12);
-  }
-// Make sure Button 2 was pressed long enough and Steve isn't already in alerts list
-  if ((sum == (len * expVal)) && (millis() - lastPress2 > 5000) && (existsName("Steve") == 0)) {
-    addPatient("Steve",39,4);
-    lastPress2 = millis();
-  }
-}
-
-void analog5Pressed()
-//Add Patient Joe when Button 1 is pressed for (LEN * 22ms)
-{
-  int len = 8;
-  int sum = 0;
-  int expVal = 1023; 
-  //Check button status for LEN * 22ms
-  for (int i = 1; i <= len; i++) 
-  { 
-  sum += analogRead(analogPin1); 
-  delay(22); 
-  }
-// Make sure Button 1 was pressed long enough and Joe isn't already in alerts list
-  if ((sum == len * expVal) && (millis() - lastPress1 > 5000) && (existsName("Joe") == 0)) {
-   // Add Patient to Queues
-    addPatient("Joe",52,3);
-    lastPress1 = millis();
-  }
-}
-
 void addPatient(String patientName, int patRoomNumber, int patRiskLevel) 
 //Add Patient Information to proper queues
 {
   nameQueue = addQueueEntry(nameQueue, patientName, 1);
   roomQueue = addQueueEntry(roomQueue, String(patRoomNumber), 1);
   riskQueue = addQueueEntry(riskQueue, String(patRiskLevel), 1);
+  timeQueue = addQueueEntry(timeQueue, String((float(millis/1000))),1)
 }
 
 void vibrate()
@@ -152,13 +106,14 @@ void vibrate()
 void updateDisplay() 
 // Update LCD display with proper patient data
 {
+  
   // Delay between refresh is faster when there are no alerts
-  if (queueSize() == 0) { lcdDelay = 750; }
+  if (queueSize() == 0) { lcdDelay = 650; }
   // Delay between multiple alerts. 
-  else { lcdDelay = 2500; }
+  else { lcdDelay = 1250; }
   
   // Scroll through multiple alerts every LCD DELAY ms. 
-  if (millis() - lastUpdate > lcdDelay) {
+  if (millis() - lastLCDUpdate > lcdDelay) {
   if (currentDisplayItem > queueSize()) 
    { 
   // 
@@ -170,63 +125,36 @@ void updateDisplay()
   displayPatientInfo(currentDisplayItem);
   // Iterate through multiple alerts
   currentDisplayItem++;
-  lastUpdate = millis();
-}
-
-if (millis() - lastPress1 > 15000 && existsName("Joe") == 1)
-{
-  removePatient("Joe");
-  lastPress1 = millis();
-}
-if (millis() - lastPress2 > 15000 && existsName("Steve") == 1)
-{
-  removePatient("Steve");
-  lastPress2 = millis();
+  lastLCDUpdate = millis();
 }
 }
 
-void removePatient(String patientName)
+void processData()
+{
+  patientTimeout();
+  
+}
+  
+void removePatient(int itemNumber)
 // Remove patient from queue
 {
-  if (existsName(patientName) == 1) {
-  int nameIndex = findNameIndex(patientName); 
-
-  nameQueue = deleteQueueEntry(nameQueue, nameIndex);
-  roomQueue = deleteQueueEntry(roomQueue, nameIndex);
-  riskQueue = deleteQueueEntry(riskQueue,nameIndex);
+  nameQueue = deleteQueueEntry(nameQueue, itemNumber);
+  roomQueue = deleteQueueEntry(roomQueue, itemNumber);
+  riskQueue = deleteQueueEntry(riskQueue, itemNumber);
+  timeQueue = deleteQueueEntry(timeQueue, itemNumber);
 }
 
-int existsName(String patientName)
-//See if patient is in Queue (Found by name)
+void patientTimeout()
 {
-  int i = 1;
-  int exName = 0;
-  while (i <= queueSize() && exName == 0)
+  if (millis() - lastTimeoutCheck > (long)timeoutInterval) {
+  for (int x = 1; x < nameQueue.length(); x++ ){
+  if (getQueueEntry(timeQueue, x).toFloat() - (float)(millis()/1000) < (float)-timeoutMins*60)
   {
-    if (getQueueEntry(nameQueue, i) == patientName)
-   {
-       exName = 1;
-   }
-   i++;
+    removePatient(itemNumber);
   }
- return exName;
-}
-
-int findNameIndex(String patientName)
-// Find index of patient in queue
-{
-  
-  printQueues("Finding Patient ---> " + patientName);
-  
-  int index = 0;
-  for (int i = 1; i <= queueSize(); i++) {
-    if (patientName == getQueueEntry(nameQueue,i))
-    {
-      index = i;
-    }
   }
-  Serial.print("Found! ---> Index of " + patientName); Serial.println(index);
-  return index;
+  lastTimeoutCheck = millis();
+  }
 }
 
 void getAllData(int itemNumber)
@@ -235,6 +163,7 @@ void getAllData(int itemNumber)
   name = getQueueEntry(nameQueue, itemNumber);
   rNum = getQueueEntry(roomQueue, itemNumber);
   riskLevel = getQueueEntry(riskQueue, itemNumber).toInt();
+  patTime = getQueueEntry(timeQueue, itemNumber).toFloat();
 }
 
 String deleteQueueEntry(String queue, int itemNumber)
@@ -306,7 +235,6 @@ String addQueueEntry(String queue, String entry, int itemNumber)
       queue = entry + "," + queue;   
     }
   return queue;
-  
 }
 
 String moveQueueEntry(String queue, int itemNumber, int newItemNumber)
@@ -339,7 +267,7 @@ int queueSize() {
   }
   return count;
 }
-
+// ***
 void displayPatientInfo(int itemNumber) {
   // Displays and formats data to LCD Display
   lcd.clear();
@@ -384,7 +312,7 @@ void displayPatientInfo(int itemNumber) {
   break;
   }
 }
-
+//***
 String formatString(String Str)
 // If name is too long then it is truncated
 {
@@ -413,6 +341,7 @@ analogWrite(gPin, 0);
 analogWrite(bPin, 0);
 }
 
+// ***
 void setRed()
 {
   setBG(255, 10, 0, brightness);
@@ -453,3 +382,35 @@ analogWrite(rPin, r);
 analogWrite(gPin, g);
 analogWrite(bPin, b);
 }
+
+int existsPatient(int room)
+//See if patient is in Queue (Found by room number)
+{
+  int i = 1;
+  int exPat = 0;
+  while (i <= queueSize() && exPat == 0)
+  {
+    if (getQueueEntry(roomQueue, i.toInt()) == room)
+   {
+       exPat = 1;
+   }
+   i++;
+  }
+ return exPat;
+}
+
+int findRoomIndex(int room )
+// Find index of patient in queue
+{
+  printQueues("Finding Patient ---> " + String(room))
+  int index = 0;
+  for (int i = 1; i <= queueSize(); i++) {
+    if (room == getQueueEntry(roomQueue,i).toInt())
+    {
+      index = i;
+    }
+  }
+  Serial.print("Found! ---> Index of " + String(room)); Serial.println(index);
+  return index;
+}
+
