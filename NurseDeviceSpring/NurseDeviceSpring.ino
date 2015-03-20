@@ -1,6 +1,6 @@
 #include <SPI.h>
 #include <Wire.h>
-#include <LiquidCrystalFast.h>
+#include <ST7565.h>
 #include <Button.h>
 
 //SETUP LCD DISPLAY
@@ -9,14 +9,8 @@ int rPin = 3;
 int gPin = 5;
 int bPin = 6;
 
-//Button 1 Pin
-int analogPin1 = 19;
-
-//Button 2 Pin
-int digButtonPin2 = 13;
-
 // Vibration Pin
-int vPin = 9;
+
 
 //Previous Button Press Time
 long lastPress1 = 0;
@@ -43,7 +37,7 @@ String timeQueue = "";
 // Initialize Single Patient Values
 String name = "";
 String rNum ="";
-int riskLevel = 1;
+int riskLevel = 0;
 float patTime=0;
 
 int currentDisplayItem = 1;
@@ -53,12 +47,18 @@ int lcdDelay = 750;; //Time btwn LCD update
 // Patient  Timeout
 int timeoutInterval = 15000; //check if patients are timed out every XX ms
 long lastTimeoutCheck = 0;//last time patient timeout was checked
-//Intialize LCD ***
 
+//Intialize LCD ***
+// pin 12 - Serial data out (SID)
+// pin 13 - Serial clock out (SCLK)
+// pin 9 - Data/Command select (RS or A0)
+// pin 11 - LCD reset (RST)
+// pin 10 - LCD chip select (CS)
+ST7565 lcd(12, 13, 9, 11, 10);
 
 void setup(void)
 {
-  lcd.begin(16, 2);  // ***
+  
   // Initialize background color pins
   pinMode(rPin, OUTPUT);
   pinMode(gPin, OUTPUT);
@@ -70,6 +70,7 @@ void setup(void)
   // Set Background of LCD to white
   setOff();
   // Wait 2 seconds for device to start
+  lcd.begin(0x1b);
   delay(2000);
 }
 
@@ -270,26 +271,25 @@ int queueSize() {
 // ***
 void displayPatientInfo(int itemNumber) {
   // Displays and formats data to LCD Display
-  lcd.clear();
+ lcd.clear();
  String lcdLine1 = "";
  String lcdLine2 = "";
  // When there are alerts to be shown
  if (queueSize() >= 1) {
-  lcdLine1 = formatString("Name: " + name);
-  lcdLine2 = formatString("Room#: " + rNum); 
+  lcdLine1 = "Name: " + name;
+  lcdLine2 = "Room#: " + rNum; 
   vibrate();
 }
 // When there are no alerts
  else {
-  lcdLine1 = formatString("   No Patient   ");
-  lcdLine2 = formatString("     Alerts   ");
+  lcdLine1 = "No Patient Alerts";
   }
+  // Print Queue Size
+  lcd.drawchar(100,0,char(queueSize()))
   // Print Line 1 of LCD
-  lcd.print(lcdLine1);
-  // Next line
-  lcd.setCursor(0,1);
+  lcd.drawstring(0, 1, lcdLine1);
   // Print Line 2 of LCD
-  lcd.print(lcdLine2);
+  lcd.drawstring(0, 2, lcdLine2);
   
   // Set background based on riskLevel
   switch (riskLevel) 
@@ -312,27 +312,6 @@ void displayPatientInfo(int itemNumber) {
   break;
   }
 }
-//***
-String formatString(String Str)
-// If name is too long then it is truncated
-{
-  if (Str.length() > 16)
-  {
-    return Str.substring(0,15);
-  }
-  else 
-  {
-    return expand16(Str);
-  }
-}
-String expand16(String Str) {
-  // a 16 character String is created by adding spaces (for LCD compatibility)
-  while (Str.length() < 16) 
-  {
-    Str += " ";
-  }
-  return Str;
-}
 
 void setOff()
 {
@@ -341,7 +320,6 @@ analogWrite(gPin, 0);
 analogWrite(bPin, 0);
 }
 
-// ***
 void setRed()
 {
   setBG(255, 10, 0, brightness);
@@ -365,8 +343,8 @@ void setGreen()
 void setBG(int r, int g, int b, int brightness) 
 {
 //Map to account for increased brightness of RED led
-r = map(r, 0, 255, 0, 120);
-g = map(g, 0, 255, 0, 150);
+r = map(r, 0, 255, 0, 200);
+g = map(g, 0, 255, 0, 200);
 
 // Map to achieve correct display brightness
 r = map(r, 0, 255, 0, brightness);
@@ -413,4 +391,19 @@ int findRoomIndex(int room )
   Serial.print("Found! ---> Index of " + String(room)); Serial.println(index);
   return index;
 }
+
+// this handy function will return the number of bytes currently free in RAM, great for debugging!   
+int freeRam(void)
+{
+  extern int  __bss_end; 
+  extern int  *__brkval; 
+  int free_memory; 
+  if((int)__brkval == 0) {
+    free_memory = ((int)&free_memory) - ((int)&__bss_end); 
+  }
+  else {
+    free_memory = ((int)&free_memory) - ((int)__brkval); 
+  }
+  return free_memory; 
+} 
 
