@@ -1,4 +1,5 @@
 #include "ST7565.h"
+#include "U8glib.h"
 
 // the LCD backlight is connected up to a pin so you can turn it on & off
 int rPin = 3;
@@ -32,39 +33,26 @@ delay(5000);
   setGreen();
   // initialize and set the contrast to 0x18
   glcd.begin(0x1b);
-
-  glcd.display(); // show splashscreen
   Serial.print(freeRam());
-  delay(2000);
   glcd.clear();
 
   // draw a string at location (0,0)
-  glcd.drawstring(0, 0, "LCD Works!");
+  String lcd1 = "1234567890abcdefghijk";
+  char message[16];
+  lcd1.toCharArray(message,16);
+  glcd.drawstring(0, 0,message );
   glcd.display();
   delay(2000);
   glcd.clear();
+
+    Serial.print(freeRam());
+    delay(20000);
 }
 
 
 void loop()                     
 {
-  glcd.drawstring(0, 0, "red");
-  setRed();
-  glcd.display();
-  delay(2500);
-  glcd.clear();
-  
-    glcd.drawstring(0, 0, "Blue");
-  setBlue();
-  glcd.display();
-  delay(2500);
-  glcd.clear();
-  
-    glcd.drawstring(0, 0, "Yellow");
-  setYellow();
-  glcd.display();
-  delay(2500);
-  glcd.clear();
+
 }
 
 // this handy function will return the number of bytes currently free in RAM, great for debugging!   

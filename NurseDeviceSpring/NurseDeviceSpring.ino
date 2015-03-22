@@ -4,14 +4,12 @@
 #include <Button.h>
 
 //SETUP LCD DISPLAY
-int brightness = 255;
+int brightness = 200;
 int rPin = 3;
 int gPin = 5;
 int bPin = 6;
 
-// Vibration Pin
-
-
+int vPin = 14;
 //Previous Button Press Time
 long lastPress1 = 0;
 long lastPress2 = 0;
@@ -25,15 +23,16 @@ int g = 0;
 int b = 0;
 
 //Demo Data
-//String nameQueue = "Albert,Bob,Carl123456789,Dick,Ed,";
-//String roomQueue = "1,2,3,4,5,";
-//String riskQueue = "3,4,3,4,4,";
-
-// Initialize Data Queues
-String nameQueue = "";
-String roomQueue = "";
-String riskQueue = "";
+String nameQueue = "Albert,Bob,Carl123456789,Dick,Ed,";
+String roomQueue = "1,2,3,4,5,";
+String riskQueue = "3,4,3,4,4,";
 String timeQueue = "";
+// Initialize Data Queues
+//String nameQueue = "";
+//String roomQueue = "";
+//String riskQueue = "";
+//String timeQueue = "";
+
 // Initialize Single Patient Values
 String name = "";
 String rNum ="";
@@ -58,7 +57,8 @@ ST7565 lcd(12, 13, 9, 11, 10);
 
 void setup(void)
 {
-  
+  // Set Background of LCD to white
+  setOff();
   // Initialize background color pins
   pinMode(rPin, OUTPUT);
   pinMode(gPin, OUTPUT);
@@ -67,8 +67,8 @@ void setup(void)
   pinMode(vPin, OUTPUT);
   // Set Vibration pin off
   digitalWrite(vPin, LOW);
-  // Set Background of LCD to white
-  setOff();
+
+
   // Wait 2 seconds for device to start
   lcd.begin(0x1b);
   delay(2000);
@@ -76,8 +76,10 @@ void setup(void)
 
 void loop(void)
 {
-  if queueSize() > 0 { lcdDelay = 750 }
-  else { lcdDelay = 1200 }
+  if (queueSize() > 0) 
+  { lcdDelay = 750; }
+  else
+  { lcdDelay = 1250; }
   
   updateDisplay();
   // Check vibration status AND 
@@ -93,7 +95,7 @@ void addPatient(String patientName, int patRoomNumber, int patRiskLevel)
   nameQueue = addQueueEntry(nameQueue, patientName, 1);
   roomQueue = addQueueEntry(roomQueue, String(patRoomNumber), 1);
   riskQueue = addQueueEntry(riskQueue, String(patRiskLevel), 1);
-  timeQueue = addQueueEntry(timeQueue, String((float(millis/1000))),1)
+  timeQueue = addQueueEntry(timeQueue, String(float(millis()/1000)),1);
 }
 
 void vibrate()
@@ -107,21 +109,9 @@ void vibrate()
 void updateDisplay() 
 // Update LCD display with proper patient data
 {
-  
-  // Delay between refresh is faster when there are no alerts
-  if (queueSize() == 0) { lcdDelay = 650; }
-  // Delay between multiple alerts. 
-  else { lcdDelay = 1250; }
-  
   // Scroll through multiple alerts every LCD DELAY ms. 
   if (millis() - lastLCDUpdate > lcdDelay) {
-  if (currentDisplayItem > queueSize()) 
-   { 
-  // 
-      currentDisplayItem = 1; 
-   }
   //Get patient data @ CURRENT DISPLAY ITEM index 
-  getAllData(currentDisplayItem);
   // Show patient data on LCD
   displayPatientInfo(currentDisplayItem);
   // Iterate through multiple alerts
@@ -132,8 +122,14 @@ void updateDisplay()
 
 void processData()
 {
-  patientTimeout();
-  
+   patientTimeout();
+   if (currentDisplayItem > queueSize()) 
+   { 
+  // 
+      currentDisplayItem = 1; 
+   }
+
+   
 }
   
 void removePatient(int itemNumber)
@@ -149,9 +145,9 @@ void patientTimeout()
 {
   if (millis() - lastTimeoutCheck > (long)timeoutInterval) {
   for (int x = 1; x < nameQueue.length(); x++ ){
-  if (getQueueEntry(timeQueue, x).toFloat() - (float)(millis()/1000) < (float)-timeoutMins*60)
+  if (getQueueEntry(timeQueue, x).toFloat() - (float)(millis()/1000) < (float)(-timeoutMins*60))
   {
-    removePatient(itemNumber);
+    removePatient(x);
   }
   }
   lastTimeoutCheck = millis();
@@ -272,24 +268,28 @@ int queueSize() {
 void displayPatientInfo(int itemNumber) {
   // Displays and formats data to LCD Display
  lcd.clear();
- String lcdLine1 = "";
- String lcdLine2 = "";
+ getAllData(currentDisplayItem);
+
  // When there are alerts to be shown
  if (queueSize() >= 1) {
-  lcdLine1 = "Name: " + name;
-  lcdLine2 = "Room#: " + rNum; 
-  vibrate();
-}
+   String S1 = "Name: " + name;
+   String S2 = "Room#: " + rNum;
+    char lcdLine1[S1.length()];
+    char lcdLine2[S2.length()];
+    S1.toCharArray(lcdLine1,S1.length());
+    S2.toCharArray(lcdLine2,S2.length());
+    vibrate();
+    lcd.drawstring(0, 1, lcdLine1);
+    lcd.drawstring(0, 2, lcdLine2);
+ }
 // When there are no alerts
  else {
-  lcdLine1 = "No Patient Alerts";
+  char lcdLine1[] = "No Patient Alerts";
+  lcd.drawstring(0, 1, lcdLine1);
+  setOff();
   }
   // Print Queue Size
-  lcd.drawchar(100,0,char(queueSize()))
-  // Print Line 1 of LCD
-  lcd.drawstring(0, 1, lcdLine1);
-  // Print Line 2 of LCD
-  lcd.drawstring(0, 2, lcdLine2);
+  lcd.drawchar(100,0,char(queueSize()));
   
   // Set background based on riskLevel
   switch (riskLevel) 
@@ -368,7 +368,7 @@ int existsPatient(int room)
   int exPat = 0;
   while (i <= queueSize() && exPat == 0)
   {
-    if (getQueueEntry(roomQueue, i.toInt()) == room)
+    if (getQueueEntry(roomQueue, i).equals(String( room)))
    {
        exPat = 1;
    }
@@ -380,7 +380,7 @@ int existsPatient(int room)
 int findRoomIndex(int room )
 // Find index of patient in queue
 {
-  printQueues("Finding Patient ---> " + String(room))
+  printQueues("Finding Patient ---> " + String(room));
   int index = 0;
   for (int i = 1; i <= queueSize(); i++) {
     if (room == getQueueEntry(roomQueue,i).toInt())
@@ -407,3 +407,10 @@ int freeRam(void)
   return free_memory; 
 } 
 
+void printQueues(String Header)
+{
+  Serial.println(Header);
+  Serial.println(nameQueue);
+  Serial.println(roomQueue);
+  Serial.println(riskQueue);
+}
