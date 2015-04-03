@@ -97,21 +97,21 @@ void displayPatientInfo() {
   // When there are alerts to be shown
   Serial.println(nameQueue);
   if (queueSize() >= 1) {
-//    String S1 = "Name: " + name;
-//    String S2 = "Room#: " + rNum;
-//    String S3 = "Secs:";
-//    S3 += String(secs());
-//    S3 += "  # Alerts: " ;
-//    S3 += String(queueSize());
-//    char lcdLine1[S1.length()+1];
-//    char lcdLine2[S2.length()+1];
-//    char lcdQueueSize[S3.length()+1];
-//    S1.toCharArray(lcdLine1, S1.length()+1);
-//    S2.toCharArray(lcdLine2, S2.length()+1);
-//    S3.toCharArray(lcdQueueSize, S3.length()+1);
-    lcd.drawstring(0, 0, strToChar("Secs: " + String(secs()) + " # Alerts: " + String(queueSize())));
-    lcd.drawstring(0, 1, strToChar( "Name: " + name));
-    lcd.drawstring(0, 2, strToChar("Room#: " + rNum));
+    String S1 = "Name: " + name;
+    String S2 = "Room#: " + rNum;
+    String S3 = "Secs:";
+    S3 += String(secs());
+    S3 += "  # Alerts: " ;
+    S3 += String(queueSize());
+    char lcdLine1[S1.length()+1];
+    char lcdLine2[S2.length()+1];
+    char lcdQueueSize[S3.length()+1];
+    S1.toCharArray(lcdLine1, S1.length()+1);
+    S2.toCharArray(lcdLine2, S2.length()+1);
+    S3.toCharArray(lcdQueueSize, S3.length()+1);
+    lcd.drawstring(0, 0, lcdQueueSize);
+    lcd.drawstring(0, 1, lcdLine1);
+    lcd.drawstring(0, 2, lcdLine2);
     lcd.display();
   }
   // When there are no alerts
@@ -157,7 +157,7 @@ void displayPatientInfo() {
 
 void processData()
 {
-  if (queueSize() > 0)  {  lcdRefresh = 500;   }
+  if (queueSize() > 0)  {  lcdRefresh = 800;   }
   else {   lcdRefresh = 1000;  }
   
   if ((secs() - getQueueEntry(timeQueue, currentDisplayItem).toInt() > timeoutSecs) && (queueSize() >= 1))
@@ -268,8 +268,8 @@ String addQueueEntry(String queue, String entry, int itemNumber)
 {
   itemNumber--;
   String temp = "";
-  int count = 0;
-  int lastIndex = 0;
+  byte count = 0;
+  byte lastIndex = 0;
   while (count < itemNumber) 
   {
     count++;
