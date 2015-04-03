@@ -1,17 +1,17 @@
-
+#include <avr/pgmspace.h>
 #include <Wire.h>
 #include <ST7565.h>
 #include <Button.h>
 
 //SETUP LCD DISPLAY
 byte brightness = 200;
-int rPin = 3;
-int gPin = 5;
-int bPin = 6;
+byte rPin = 3;
+byte gPin = 5;
+byte bPin = 6;
 
-int postSetup = 0;
+byte postSetup = 0;
 //Previous Button Press Time
-int scrollPatientTime = 3;
+byte scrollPatientTime = 5;
 int lastScroll = 0;
 //initialize RGB values for backlight
 int r = 0;
@@ -35,11 +35,12 @@ String name = "";
 String rNum ="";
 byte riskLevel = 0;
 int patTime=0;
+byte carl = 0;
 
 byte currentDisplayItem = 1;
-long lastPatientTIme = 0;
-byte timeoutSecs = 12; //Patient timeout Period secs
-long lastLCDUpdate = 0; // Last Time LCD was updated
+int lastPatientTIme = 0;
+byte timeoutSecs = 10;; //Patient timeout Period secs
+int lastLCDUpdate = 0; // Last Time LCD was updated
 int lcdRefresh = 1250; //Time btwn LCD update
 // Patient  Timeout
 int lastTimeoutCheck = 0; //last time patient timeout was checked
@@ -53,7 +54,8 @@ int lastTimeoutCheck = 0; //last time patient timeout was checked
 ST7565 lcd(12, 13, 9, 11, 10);
 
 void setup(void)
-{                
+{      
+  
   Serial.begin(9600);
   // Set Background of LCD to white
   setOff();
@@ -68,7 +70,6 @@ void setup(void)
   delay(8000);
   lcd.clear();
   ram();
-  Serial.println(getQueueEntry(nameQueue,1));
   delay(3000);
   postSetup = secs();
 }
@@ -77,42 +78,56 @@ void loop(void)
 {
   processData();
   updateDisplay();
+  if (secs() > 30 && carl==0)
+  {
+    Serial.println(F("Carl Added to Queue"));
+    carl=1;
+    addPatient(String("Carl,"),40,4);
+  }
+}
+
+char* strToChar(String str)
+{
+  return (char*)str.c_str() ;
 }
 
 void displayPatientInfo() {
   // Displays and formats data to LCD Display
   lcd.clear();
   // When there are alerts to be shown
-  printQueues(String(queueSize()));
+  Serial.println(nameQueue);
   if (queueSize() >= 1) {
-    String S1 = "Name: " + name;
-    String S2 = "Room#: " + rNum;
-    String S3 = "Secs:";
-    S3 += String(secs());
-    S3 += "  # Alerts: " ;
-    S3 += String(queueSize());
-    char lcdLine1[S1.length()+1];
-    char lcdLine2[S2.length()+1];
-    char lcdQueueSize[S3.length()+1];
-    S1.toCharArray(lcdLine1, S1.length()+1);
-    S2.toCharArray(lcdLine2, S2.length()+1);
-    S3.toCharArray(lcdQueueSize, S3.length()+1);
-    lcd.drawstring(0, 0, lcdQueueSize);
-    lcd.drawstring(0, 1, lcdLine1);
-    lcd.drawstring(0, 2, lcdLine2);
+//    String S1 = "Name: " + name;
+//    String S2 = "Room#: " + rNum;
+//    String S3 = "Secs:";
+//    S3 += String(secs());
+//    S3 += "  # Alerts: " ;
+//    S3 += String(queueSize());
+//    char lcdLine1[S1.length()+1];
+//    char lcdLine2[S2.length()+1];
+//    char lcdQueueSize[S3.length()+1];
+//    S1.toCharArray(lcdLine1, S1.length()+1);
+//    S2.toCharArray(lcdLine2, S2.length()+1);
+//    S3.toCharArray(lcdQueueSize, S3.length()+1);
+    lcd.drawstring(0, 0, strToChar("Secs: " + String(secs()) + " # Alerts: " + String(queueSize())));
+    lcd.drawstring(0, 1, strToChar( "Name: " + name));
+    lcd.drawstring(0, 2, strToChar("Room#: " + rNum));
     lcd.display();
   }
   // When there are no alerts
   else {
     lcd.clear();
-    Serial.println("No Alerts");
-    char lcdLine1[18] = "No Patient Alerts";
-    lcd.drawstring(0, 1, lcdLine1);
+    Serial.println(F("No Alerts"));
+
+    lcd.drawstring(0,0,strToChar(String(secs())));
+    lcd.drawstring(0, 1, "No Patient Alerts");
     lcd.display();
+    ram();
     name = "";
     rNum ="";
     riskLevel = 1;
     patTime=0;
+    ram();
   }
   // Set background based on riskLevel
   switch (riskLevel)
@@ -134,7 +149,7 @@ void displayPatientInfo() {
     break;
     //High Risk - RED
   case 4:
-  brightness = 200;
+  brightness = 250;
     setRed();
     break;
   }
@@ -172,29 +187,11 @@ void updateDisplay()
     ram();
   }
 }
-
-//void patientTimeout() {
-//  // 2000 ms Timeout check interval
-//  long begtime = millis();
-//  if (secs() - lastTimeoutCheck > 5) {
-//    Serial.println("Checking Timeout");
-//    for (int x = 1; x < queueSize(); x++ ){
-//      Serial.println(getQueueEntry(timeQueue, x));
-//      if (getQueueEntry(timeQueue, x).toInt() - secs() < timeoutSecs)
-//      { 
-//        Serial.println("Removing Patient " + String(x));
-//        removePatient(x); 
-//      }
-//    }
-//    lastTimeoutCheck = secs();
-//  }
-//  //Serial.println("Time to Timeout Patients = "+ String(millis() - begtime));
-//}
-
 void addPatient(String patientName, int patRoomNumber, int patRiskLevel) 
 //Add Patient Information to proper queues
 {
   nameQueue = addQueueEntry(nameQueue, patientName, 1);
+  Serial.println(nameQueue);
   roomQueue = addQueueEntry(roomQueue, String(patRoomNumber), 1);
   riskQueue = addQueueEntry(riskQueue, String(patRiskLevel), 1);
   timeQueue = addQueueEntry(timeQueue, String(secs()),1);
@@ -292,9 +289,9 @@ String addQueueEntry(String queue, String entry, int itemNumber)
 
 void setOff()
 {
-  analogWrite(rPin, 0);
-  analogWrite(gPin, 0);
-  analogWrite(bPin, 0);
+  digitalWrite(rPin, HIGH);
+  digitalWrite(gPin, HIGH);
+  digitalWrite(bPin, HIGH);
 }
 
 void setRed()
@@ -405,22 +402,32 @@ void printQueues(String Header)
 
 int secs() { return (int)(millis()/1000) - postSetup; }
 
-String moveQueueEntry(String queue, int itemNumber, int newItemNumber)
-// Can be used to sort queues by moving items from itemNumber to new ItemNumber
-{
-  String temp = getQueueEntry(queue, itemNumber);
-  if (itemNumber > newItemNumber) 
-  {
-    queue = addQueueEntry(queue,temp, newItemNumber);
-    queue = deleteQueueEntry(queue, newItemNumber);
-    queue = deleteQueueEntry(queue, itemNumber+1);
-  }
-  if (itemNumber < newItemNumber) 
-  {
-    queue = deleteQueueEntry(queue, itemNumber);
-    queue = addQueueEntry(queue,temp, newItemNumber);
-    queue = deleteQueueEntry(queue, newItemNumber);
-  }
-  return queue;
-}
+
+
+
+
+
+
+
+
+//
+//
+//String moveQueueEntry(String queue, int itemNumber, int newItemNumber)
+//// Can be used to sort queues by moving items from itemNumber to new ItemNumber
+//{
+//  String temp = getQueueEntry(queue, itemNumber);
+//  if (itemNumber > newItemNumber) 
+//  {
+//    queue = addQueueEntry(queue,temp, newItemNumber);
+//    queue = deleteQueueEntry(queue, newItemNumber);
+//    queue = deleteQueueEntry(queue, itemNumber+1);
+//  }
+//  if (itemNumber < newItemNumber) 
+//  {
+//    queue = deleteQueueEntry(queue, itemNumber);
+//    queue = addQueueEntry(queue,temp, newItemNumber);
+//    queue = deleteQueueEntry(queue, newItemNumber);
+//  }
+//  return queue;
+//}
 
