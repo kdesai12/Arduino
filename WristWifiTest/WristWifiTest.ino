@@ -1,97 +1,153 @@
 #include <SoftwareSerial.h>
 #include <OneWire.h>
 
-#define SSID        "MyHomeSSID"
-#define PASS        "MyPassword"
-#define TARGET_IP   "192.168.1.xx"
-#define TARKET_PORT 5000
+#define ssid        "SQUAD"
+#define pass        ""
 
-SoftwareSerial wifi(2,3); // RX,TX
-int incomingByte=0;
+SoftwareSerial esp8266(18 ,19); // RX,TX
 
 void setup(void)
 {      
   Serial.begin(9600);
-  wifi.begin(9600);
-  
-  joinNetwork();
-  
-  wifi.println("AT+CIPMUX=0");
-  receive();
-  
+  esp8266.begin(9600);
+  delay(5000);
+ setupWifi();
 }
-
 
 void loop(void)
 {
-  
+getWifiData();
 }
 
-void joinNetwork()
+void setupWifi()
 {
-  wifi.println("AT+CWMODE=3");
- receive();
-  Serial.println("Joining SQUAD");
-  wifi.print("AT+CWJAP=");
-  wifi.print(SSID);  
-  wifi.print(",");
-  wifi.print(PASS);
-  wifi.println("");
-  receive();
-  delay(2500);
-  Serial.println("Connected to Squad");
-  wifi.println("AT+CWJAP?");
-  receive();
-  printiP();
-
+  while(!resetModule()) {};
+  //Serial.println("Module was successfully restarted");
+  while(!connectWifi()) {};
+  //Serial.println("Module was successfully Connected ");
+  printIp();
+  while(!setServer()) {};
+  //Serial.println("Server Created");
+}
   
+boolean resetModule()
+{
+  //Serial.println("Resetting");
+  esp8266.println("AT+RST");
+  delay(1000);
+  while(esp8266.available())
+  {
+  if(esp8266.find("ready"))
+  {
+    //Serial.println("Module is ready");
+    return true;
+  } else {
+    //Serial.println("Module is unavailable. Restarting it.");
+    return false;
+  }
+  }
 }
 
-void resetWifi();{
-  wifi.println("AT+RST");
-  receive();
-}
-// to tx
-void setClient()
+boolean connectWifi()
 {
-  wifi.println("AT+CIPMUX=1");
-  receive();
-  wifi.println("AT+CIPSTART=4,\"TCP\", \"IPADDRESSHERE\",80"); // 4 = channel; 80 = port
-  receive();
+  esp8266.println("AT+CWMODE=1");
+  String cmd = "AT+CWJAP=\"";
+  cmd+=ssid;
+  cmd+="\",\"";
+  cmd+=pass;
+  cmd+="\"";
+  esp8266.println(cmd);
+  //Serial.println(cmd);
+  while(!esp8266.available()){}
+  delay(3000);
+
+  if(esp8266.find("OK"))
+  {
+    //Serial.println("Connected to Wifi");
+    while(!esp8266.available()){}
+    if(esp8266.find("OK"))
+    {  return true; }
+    else
+    {  return false; }
+  }
+  else  
+  {
+    //Serial.println("Cannot connect to WiFi. Trying again!");
+    delay(2500);
+    return false;
+  }
 }
+
 // to rx
-void setServer()
+boolean setServer()
 {
-    wifi.println("AT+CIPMUX=1");
+    esp8266.println("AT+CIPMUX=1");
     receive();
-    printIp();
-    wifi.println("AT+CIPSERVER=1,80"); // 1 = listening ---1336 = port number
-    receive();
-}
+    esp8266.println("AT+CIPSERVER=1,1100");
+    // 1 = listening ---1100 = port number
+    delay(500);
+    while(!esp8266.available()){}
+    if(esp8266.find("OK"))    {  
+      //Serial.println("Server Started"); 
+    return true;   }
+    else { return false; }
+} 
 
-// Get the data from the WiFi module and send it to the debug serial port
+// Get the data from the WiFi module and send it to the debug //Serial port
 void receive(){
   delay(300);
-  Serial.println("-----RX-----");
-  while (wifi.available() >0) {
-    incomingByte = wifi.read();
-    Serial.write(incomingByte);
+  //Serial.println("-----RX-----");
+  while (esp8266.available() >0) {
+    Serial.write(esp8266.read());
   }
-  Serial.println();
+  //Serial.println();
 }
 
-void sendData(String channel, String data)
+void getWifiData()
 {
-// Send the data to the WiFi module
-  wifi.print("AT+CIPSEND=");
-  wifi.print(channel);
-  wifi.print(",");
-  wifi.println(data.length());
-  delay(500);
-  wifi.print(data);
-  receive();
+  int index = 0;
+  String message = "";
+    while(esp8266.available()) // read the command character by character
+    {
+      delay(50);
+        // read one character
+      message+=char(esp8266.read());
+    }
+    if (!message.equals("")){
+    Serial.print("Data = "+ message); // send the read character to the esp8266  
+    }
+  for (byte i = 1; i < message.length();i++)
+  {
+    if (message.charAt(i) == '-') {   index = i; }
+  }
+  
+if (index > 0) {
+  Serial.println("Found Hyphen");
+  String tempRoom = message.substring(index-2,index);
+  String tempRisk = message.substring(index+1);
+  Serial.println("Room Number = " + tempRoom);
+  Serial.println("Risk Level = " + tempRisk);
+    ram();
+  }
+
+}
+  
+void printIp() {
+esp8266.println("AT+CIFSR"); receive(); 
 }
 
-void printIp() {
-wifi.println("AT+CIFSR"); receive(); 
+int freeRam(void)
+{
+  extern int  __bss_end;
+  extern int  *__brkval;
+  int free_memory;
+  if ((int)__brkval == 0) {
+    free_memory = ((int)&free_memory) - ((int)&__bss_end);
+  }
+  else {
+    free_memory = ((int)&free_memory) - ((int)__brkval);
+  }
+  return free_memory;
 }
+
+void ram() { Serial.println("Free Ram --> " + String(freeRam()));  }
